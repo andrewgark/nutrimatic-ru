@@ -117,24 +117,33 @@ RESULT_PAGE_END = """
 # List of syntax descriptions and examples for the search page
 
 SYNTAX = [
-  ("a-z, 0-9, space", "literal match"),
+  ("a-z, 0-9, space", "literal match (Latin, digits, space)"),
   ("[], (), {}, |, ., ?, *, +", "same as regexp"),
   ("\"expr\"", "forbid word breaks without a space or hyphen"),
-  ("expr&expr", "both expressions must match"),
+  ("expr&expr", "both expressions must match (intersection)"),
   ("<aaagmnr>, <(gram)(ana)>",
    "anagram of contents (<a href=usage.html#syntax_anagram>note warnings</a>)"),
-  ("_ (underscore)", "alphanumeric, not space: [a-z0-9]"),
-  ("# (number sign)", "digit: [0-9]"),
   ("- (hyphen)", "optional space: ( ?)"),
-  ("A", "alphabetic: [a-z]"),
-  ("C", "consonant (including y)"),
-  ("V", "vowel ([aeiou], not y)"),
+  ("_ (underscore)", "alphanumeric, no space: [a-z0-9]"),
+  ("# (number sign)", "digit: [0-9]"),
+  ("A", "Latin letter: [a-z]"),
+  ("C", "Latin consonant (including y)"),
+  ("V", "Latin vowel ([aeiou], not y)"),
+  ("R", "Cyrillic letter: [а-яё]"),
+  ("K", "Cyrillic consonant"),
+  ("U", "Cyrillic vowel (а,е,ё,и,о,у,ы,э,ю,я)"),
+  ("L", "alphanumeric + Cyrillic: [a-z0-9а-яё]"),
 ]
 
 EXAMPLES = [
   ("\"C*aC*eC*iC*oC*uC*yC*\"", "facetiously"),
   ("867-####", "for a good time call"),
   ("\"_ ___ ___ _*burger\"", "lol"),
+  ("<привет>", "anagram (e.g. привет, пирвет)"),
+  ("R+", "Cyrillic word"),
+  ("helloR+ ", "Latin + Cyrillic (e.g. helloпривет)"),
+  ("R+#+ ", "Cyrillic word + digits (e.g. привет123)"),
+  ("[а-я]+ ", "Cyrillic word (character class)"),
 ]
 
 EDITIONS = [

@@ -136,11 +136,14 @@ Nutrimatic supports UTF-8 and Cyrillic. To build an index from Russian Wikipedia
 
 ### Serving the web interface
 
-If you want to run the [nutrimatic.org](https://nutrimatic.org/) style
-interface, point a web server at the `web_static/` directory, and for
+**Local (Russian index):** From the project root, run
+`python3 run_server.py [port]` (default port 8765). Open
+http://localhost:8765/ — uses `build/find-expr` and `wiki-merged.index`.
+
+**Production:** Point a web server at the `web_static/` directory, and for
 root requests have it launch `cgi_scripts/cgi-search.py` with
 `$NUTRIMATIC_FIND_EXPR` set to the `find-expr` binary and `$NUTRIMATIC_INDEX`
-set to the index you built.
+set to the index you built. See `nginx-nutrimatic-ru.conf.example` for nginx + fcgiwrap.
 
 (You might want to use `install_to_dir.py` which will copy executables,
 CGI scripts, and static content to the directory of your choice.)

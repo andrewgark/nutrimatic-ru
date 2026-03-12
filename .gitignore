@@ -9,3 +9,4 @@ __pycache__
 *.index
 *.xml
 *.xml.bz2
+/text/

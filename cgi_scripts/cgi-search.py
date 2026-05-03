@@ -40,7 +40,7 @@ HOME_PAGE_BEGIN = """
 <input type=submit name=go value="Go">
 </form>
 <p>Matches patterns against a dictionary of words and phrases
-mined from Wikipedia.  Text is normalized to lowercase letters
+mined from Russian Wikipedia.  Text is normalized to lowercase letters
 (Latin and Cyrillic), numbers and spaces.  More common results
 are returned first.  Input is UTF-8.</p>
 """
@@ -69,9 +69,11 @@ HOME_PAGE_LIST_END = """
 HOME_PAGE_END = """
 <h3>More</h3>
 <ul>
-<li><a href="usage.html">Usage guide</a>: usage tips,
+<li><a href="usage.html">Usage guide</a> (for the original
+English‑Wikipedia Nutrimatic): usage tips,
 worked examples, why it's slow.
-<li><a href="https://github.com/PuzzleTechHub/nutrimatic">Source code</a>:
+<li><a href="https://github.com/andrewgark/nutrimatic-ru">Source code</a>
+for this Russian Wikipedia fork on GitHub:
 not completely documented, but it's there!
 </ul>
 
@@ -124,31 +126,32 @@ SYNTAX = [
   ("<aaagmnr>, <(gram)(ana)>",
    "anagram of contents (<a href=usage.html#syntax_anagram>note warnings</a>)"),
   ("- (hyphen)", "optional space: ( ?)"),
-  ("_ (underscore)", "alphanumeric, no space: [a-z0-9]"),
+  ("_ (underscore)", "one letter/digit: [a-zа-я0-9] (UTF-8)"),
   ("# (number sign)", "digit: [0-9]"),
   ("A", "Latin letter: [a-z]"),
   ("C", "Latin consonant (including y)"),
   ("V", "Latin vowel ([aeiou], not y)"),
-  ("R", "Cyrillic letter: [а-яё]"),
+  ("R", "Cyrillic letter: [а-я]"),
   ("S", "Cyrillic consonant"),
-  ("G", "Cyrillic vowel (а,е,ё,и,о,у,ы,э,ю,я)"),
-  ("L", "alphanumeric + Cyrillic: [a-z0-9а-яё]"),
+  ("G", "Cyrillic vowel (а,е,и,о,у,ы,э,ю,я)"),
 ]
 
 EXAMPLES = [
-  ("\"C*aC*eC*iC*oC*uC*yC*\"", "facetiously"),
-  ("867-####", "for a good time call"),
-  ("\"_ ___ ___ _*burger\"", "lol"),
-  ("<привет>", "anagram (e.g. привет, пирвет)"),
-  ("R+", "Cyrillic word"),
-  ("helloR+ ", "Latin + Cyrillic (e.g. helloпривет)"),
-  ("R+#+ ", "Cyrillic word + digits (e.g. привет123)"),
-  ("[а-я]+ ", "Cyrillic word (character class)"),
+  ("\"SGSGSGS\"",
+   "seven letters, alternating Cyrillic consonant / vowel (quoted = one word)"),
+  ("<ватерполистка>", "anagram"),
+  ("13п_*у",
+   "numbers and letters"),
+  ("\"_ ____ю __ ______\"",
+   "partially filled mask"),
+  ("\"CC RRR\"", "Latin + Cyrillic"),
 ]
 
 EDITIONS = [
-  ("https://nutrimatic.org/2016/", "'classic' original"),
-  ("https://nutrimatic.org/2024/", "current edition (refreshed index)"),
+  ("https://nutrimatic.org/2016/",
+   "“Classic” public Nutrimatic; dictionary from the English Wikipedia"),
+  ("https://nutrimatic.org/2024/",
+   "Current public Nutrimatic; refreshed English‑Wikipedia index"),
 ]
 
 binary = os.environ["NUTRIMATIC_FIND_EXPR"]
@@ -177,7 +180,7 @@ if 'q' not in fs:  # No query, emit the home page
       })
   print(HOME_PAGE_LIST_END)
 
-  print(HOME_PAGE_LIST_BEGIN % {"title": "Editions"})
+  print(HOME_PAGE_LIST_BEGIN % {"title": "Original versions"})
   for url, text in EDITIONS:
     parts = urllib.parse.urlparse(url)._replace(scheme="")
     print(HOME_PAGE_EDITION_ROW % {

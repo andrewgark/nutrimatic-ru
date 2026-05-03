@@ -131,10 +131,9 @@ commonly used classes of characters:</p>
 <dd><tt><b>R</b></tt> - any Cyrillic lowercase letter, equivalent to <tt>[а-яё]</tt>
 <dd><tt><b>S</b></tt> - any Cyrillic consonant (letters matched by <tt>R</tt> except the vowels for <tt>G</tt>)
 <dd><tt><b>G</b></tt> - any Cyrillic vowel (<tt>а,е,ё,и,о,у,ы,э,ю,я</tt>)
-<dd><tt><b>L</b></tt> - any Latin letter or digit or Cyrillic letter (<tt>[a-z0-9а-яё]</tt>)
 <dd><tt><b>.</b></tt> (dot) - any character: letters (Latin and Cyrillic), digits, space
-<dd><tt><b>_</b></tt> (underscore) - any letter or number (Latin and Cyrillic), equivalent to
-<tt>[a-z0-9]</tt> plus UTF-8 bytes
+<dd><tt><b>_</b></tt> (underscore) - one Latin letter or digit, or one Cyrillic letter
+(<tt>[a-z0-9а-яё]</tt> as UTF-8); there is no separate <tt>L</tt> operator
 <dd><tt><b>-</b></tt> (hyphen) - an optional space, equivalent to <tt>( ?)</tt>
 <dd><tt><b>#</b></tt> (number sign) - any digit, equivalent to <tt>[0-9]</tt>
 </dl>

@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
       "a b ",
       "axb ");
 
-  /* _ (underscore) = alphanumeric [a-z0-9], not space */
+  /* _ (underscore) = alphanumeric: Latin [a-z0-9] + Cyrillic letters (UTF-8) */
   TestIndex(
       "_+ ",
       "x1 ",
@@ -255,6 +255,12 @@ int main(int argc, char *argv[]) {
       "\xd0\xbc\xd0\xbe\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 " /* москва */,
       "\xd0\xbc\xd0\xb0\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 " /* масква */);
 
+  /* Russian: _ is one letter/digit; "____ва" matches москва (four letters + ва) */
+  TestIndex(
+      "\"____\xd0\xb2\xd0\xb0\" " /* "____ва" */,
+      "\xd0\xbc\xd0\xbe\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 " /* москва */,
+      "\xd0\xb2\xd0\xb0 " /* ва */);
+
   /* Russian: code-point character class [мо][мо]сква matches москва */
   TestIndex(
       "[\xd0\xbc\xd0\xbe][\xd0\xbc\xd0\xbe]\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 ",
@@ -284,9 +290,9 @@ int main(int argc, char *argv[]) {
       "\xd0\xb1\xd0\xb2\xd0\xb3 " /* бвг */,
       "\xd0\xb0\xd0\xb5 " /* ае */);
 
-  /* L = alphanumeric including Cyrillic [a-z0-9а-яё] */
+  /* _ = same letter/digit set as former L+ (Latin + Cyrillic) */
   TestIndex(
-      "L+ ",
+      "_+ ",
       "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82 " /* привет */,
       " ");
 
@@ -308,9 +314,9 @@ int main(int argc, char *argv[]) {
       "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82""123 " /* привет123 */,
       "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82""abc " /* приветabc */);
 
-  /* L mixes Latin, Cyrillic, digits */
+  /* _ mixes Latin, Cyrillic, digits (same as former L*99L*) */
   TestIndex(
-      "L*99L* ",
+      "_*99_* ",
       "x99\xd0\xb0 " /* x99а */,
       "x98\xd0\xb0 " /* x98а - 98 not 99 */);
 

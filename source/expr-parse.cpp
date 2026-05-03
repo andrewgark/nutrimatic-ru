@@ -209,12 +209,20 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
     return p + 1;
   }
   if (*p == '_') {
+    /* Like Latin [a-z0-9] plus Cyrillic letters as UTF-8 (one code point each),
+       not raw high bytes (which would not match UTF-8 м, о, … as single units). */
     for (int ch = '0'; ch <= '9'; ++ch)
       elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
     for (int ch = 'a'; ch <= 'z'; ++ch)
       elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int ch = 0x80; ch <= 0xFF; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+    for (int cp = 0x0430; cp <= 0x044F; ++cp) {
+      std::vector<unsigned char> bytes;
+      utf8_encode(cp, &bytes);
+      elements->push_back(bytes);
+    }
+    std::vector<unsigned char> yo;
+    utf8_encode(0x0451, &yo);
+    elements->push_back(yo);
     return p + 1;
   }
   if (*p == '#') {
@@ -239,8 +247,8 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
         elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
     return p + 1;
   }
-  /* R = Cyrillic letter [а-яё]; S = Cyrillic consonant; G = Cyrillic vowel;
-     L = alphanumeric including Cyrillic [a-z0-9а-яё] */
+  /* R = Cyrillic letter [а-яё]; S = Cyrillic consonant; G = Cyrillic vowel.
+     Latin digits + letters and Cyrillic letters for “word chars” use _ . */
   if (*p == 'R') {
     for (int cp = 0x0430; cp <= 0x044F; ++cp) {
       std::vector<unsigned char> bytes;
@@ -274,21 +282,6 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
       elements->push_back(bytes);
     }
     /* ё is vowel, skip */
-    return p + 1;
-  }
-  if (*p == 'L') {
-    for (int ch = '0'; ch <= '9'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int cp = 0x0430; cp <= 0x044F; ++cp) {
-      std::vector<unsigned char> bytes;
-      utf8_encode(cp, &bytes);
-      elements->push_back(bytes);
-    }
-    std::vector<unsigned char> yo;
-    utf8_encode(0x0451, &yo);
-    elements->push_back(yo);
     return p + 1;
   }
   return NULL;

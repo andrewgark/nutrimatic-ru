@@ -8,6 +8,10 @@ Usage (from project root):
   # Default port 8765. Open http://localhost:8765/
 
 Requires: build/find-expr, wiki-merged.index, cgi_scripts/cgi-search.py
+
+If searches fail with "can't parse" for S, G, or other operators shown on the
+home page, rebuild find-expr from this tree (e.g. ``conan build .`` or your
+Meson build) so the binary matches ``source/expr-parse.cpp``.
 """
 
 import os
@@ -16,6 +20,15 @@ import sys
 from pathlib import Path
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+def strip_cgi_headers(stdout: bytes) -> bytes:
+    """Drop CGI-style stdout headers so they are not sent in the HTTP body."""
+    if b"\r\n\r\n" in stdout:
+        return stdout.split(b"\r\n\r\n", 1)[1]
+    if b"\n\n" in stdout:
+        return stdout.split(b"\n\n", 1)[1]
+    return stdout
+
 
 TOP = Path(__file__).resolve().parent
 WEB_STATIC = TOP / "web_static"
@@ -81,10 +94,12 @@ class NutrimaticHandler(BaseHTTPRequestHandler):
             self.send_error(500, str(e))
             return
 
+        body = strip_cgi_headers(r.stdout)
+
         self.send_response(200)
         self.send_header("Content-type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(r.stdout)
+        self.wfile.write(body)
 
         if r.stderr:
             self.log_error("%s", r.stderr.decode(errors="replace"))

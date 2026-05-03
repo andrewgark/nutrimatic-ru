@@ -130,8 +130,8 @@ SYNTAX = [
   ("C", "Latin consonant (including y)"),
   ("V", "Latin vowel ([aeiou], not y)"),
   ("R", "Cyrillic letter: [а-яё]"),
-  ("K", "Cyrillic consonant"),
-  ("U", "Cyrillic vowel (а,е,ё,и,о,у,ы,э,ю,я)"),
+  ("S", "Cyrillic consonant"),
+  ("G", "Cyrillic vowel (а,е,ё,и,о,у,ы,э,ю,я)"),
   ("L", "alphanumeric + Cyrillic: [a-z0-9а-яё]"),
 ]
 

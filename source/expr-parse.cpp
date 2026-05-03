@@ -239,7 +239,7 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
         elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
     return p + 1;
   }
-  /* R = Cyrillic letter [а-яё]; K = Cyrillic consonant; U = Cyrillic vowel;
+  /* R = Cyrillic letter [а-яё]; S = Cyrillic consonant; G = Cyrillic vowel;
      L = alphanumeric including Cyrillic [a-z0-9а-яё] */
   if (*p == 'R') {
     for (int cp = 0x0430; cp <= 0x044F; ++cp) {
@@ -252,7 +252,7 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
     elements->push_back(yo);
     return p + 1;
   }
-  if (*p == 'U') {
+  if (*p == 'G') {
     static const int cyr_vowels[] = {
       0x0430, 0x0435, 0x0451, 0x0438, 0x043E, 0x0443,
       0x044B, 0x044D, 0x044E, 0x044F
@@ -264,7 +264,7 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
     }
     return p + 1;
   }
-  if (*p == 'K') {
+  if (*p == 'S') {
     for (int cp = 0x0430; cp <= 0x044F; ++cp) {
       if (cp == 0x0430 || cp == 0x0435 || cp == 0x0438 || cp == 0x043E ||
           cp == 0x0443 || cp == 0x044B || cp == 0x044D || cp == 0x044E ||

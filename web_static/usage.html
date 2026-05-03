@@ -128,6 +128,10 @@ commonly used classes of characters:</p>
 <dd><tt><b>C</b></tt> - any consonant (including y), equivalent to
 <tt>[bcdfghjklmnpqrstvwxyz]</tt>
 <dd><tt><b>V</b></tt> - any vowel (excluding y), equivalent to <tt>[aeiou]</tt>
+<dd><tt><b>R</b></tt> - any Cyrillic lowercase letter, equivalent to <tt>[а-яё]</tt>
+<dd><tt><b>S</b></tt> - any Cyrillic consonant (letters matched by <tt>R</tt> except the vowels for <tt>G</tt>)
+<dd><tt><b>G</b></tt> - any Cyrillic vowel (<tt>а,е,ё,и,о,у,ы,э,ю,я</tt>)
+<dd><tt><b>L</b></tt> - any Latin letter or digit or Cyrillic letter (<tt>[a-z0-9а-яё]</tt>)
 <dd><tt><b>.</b></tt> (dot) - any character: letters (Latin and Cyrillic), digits, space
 <dd><tt><b>_</b></tt> (underscore) - any letter or number (Latin and Cyrillic), equivalent to
 <tt>[a-z0-9]</tt> plus UTF-8 bytes

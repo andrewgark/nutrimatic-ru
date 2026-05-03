@@ -273,14 +273,14 @@ int main(int argc, char *argv[]) {
       "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82 " /* привет */,
       "123 ");
 
-  /* U = Cyrillic vowel; K = Cyrillic consonant */
+  /* G = Cyrillic vowel; S = Cyrillic consonant */
   TestIndex(
-      "U+ ",
+      "G+ ",
       "\xd0\xb0\xd1\x83 " /* ау */,
       "\xd0\xb1\xd0\xb2 " /* бв */);
 
   TestIndex(
-      "K+ ",
+      "S+ ",
       "\xd0\xb1\xd0\xb2\xd0\xb3 " /* бвг */,
       "\xd0\xb0\xd0\xb5 " /* ае */);
 

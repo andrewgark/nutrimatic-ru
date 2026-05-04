@@ -119,13 +119,12 @@ RESULT_PAGE_END = """
 # List of syntax descriptions and examples for the search page
 
 SYNTAX = [
-  ("a-z, 0-9, space", "literal match (Latin, digits, space)"),
+  ("a-z, а-я, 0-9, space", "literal match (Latin, Cyrillic, digits, space)"),
   ("[], (), {}, |, ., ?, *, +", "same as regexp"),
   ("\"expr\"", "forbid word breaks without a space or hyphen"),
   ("expr&expr", "both expressions must match (intersection)"),
   ("<aaagmnr>, <(gram)(ana)>",
    "anagram of contents (<a href=usage.html#syntax_anagram>note warnings</a>)"),
-  ("- (hyphen)", "optional space: ( ?)"),
   ("_ (underscore)", "one letter/digit: [a-zа-я0-9] (UTF-8)"),
   ("# (number sign)", "digit: [0-9]"),
   ("A", "Latin letter: [a-z]"),
@@ -133,7 +132,7 @@ SYNTAX = [
   ("V", "Latin vowel ([aeiou], not y)"),
   ("R", "Cyrillic letter: [а-я]"),
   ("S", "Cyrillic consonant"),
-  ("G", "Cyrillic vowel (а,е,и,о,у,ы,э,ю,я)"),
+  ("G", "Cyrillic vowel (а, е, и, о, у, ы, э, ю, я)"),
 ]
 
 EXAMPLES = [

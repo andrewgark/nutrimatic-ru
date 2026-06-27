@@ -69,8 +69,8 @@ HOME_PAGE_LIST_END = """
 HOME_PAGE_END = """
 <h3>More</h3>
 <ul>
-<li><a href="usage.html">Usage guide</a> (for the original
-English‑Wikipedia Nutrimatic): usage tips,
+<li><a href="https://nutrimatic.org/usage.html">Usage guide</a> (original
+English‑Wikipedia Nutrimatic on nutrimatic.org): usage tips,
 worked examples, why it's slow.
 <li><a href="https://github.com/andrewgark/nutrimatic-ru">Source code</a>
 for this Russian Wikipedia fork on GitHub:
@@ -124,7 +124,7 @@ SYNTAX = [
   ("\"expr\"", "forbid word breaks without a space or hyphen"),
   ("expr&expr", "both expressions must match (intersection)"),
   ("<aaagmnr>, <(gram)(ana)>",
-   "anagram of contents (<a href=usage.html#syntax_anagram>note warnings</a>)"),
+   "anagram of contents (<a href=\"https://nutrimatic.org/usage.html#syntax_anagram\">note warnings</a>)"),
   ("_ (underscore)", "one letter/digit: [a-zа-я0-9] (UTF-8)"),
   ("# (number sign)", "digit: [0-9]"),
   ("A", "Latin letter: [a-z]"),

@@ -261,6 +261,26 @@ int main(int argc, char *argv[]) {
       "\xd0\xbc\xd0\xbe\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 " /* москва */,
       "\xd0\xb2\xd0\xb0 " /* ва */);
 
+  /* Russian: . is one letter/digit/space (UTF-8), not one high byte.
+     "...ь" must match день (4 letters), not "и ь" (letter + space + ь). */
+  TestIndex(
+      "\"...\xd1\x8c\" " /* "...ь" */,
+      "\xd0\xb4\xd0\xb5\xd0\xbd\xd1\x8c " /* день */,
+      "\xd0\xb8 \xd1\x8c " /* и ь */);
+
+  /* Russian: [^б] forbids only б as a letter, not the shared UTF-8 lead byte.
+     "[^б]ень" matches день; must not treat D0 as a forbidden raw byte. */
+  TestIndex(
+      "\"[^\xd0\xb1]\xd0\xb5\xd0\xbd\xd1\x8c\" " /* "[^б]ень" */,
+      "\xd0\xb4\xd0\xb5\xd0\xbd\xd1\x8c " /* день */,
+      "\xd0\xb1\xd0\xb5\xd0\xbd\xd1\x8c " /* бень */);
+
+  /* Russian: [^а]а matches ба (Cyrillic), not only Latin/digit + а. */
+  TestIndex(
+      "\"[^\xd0\xb0]\xd0\xb0\" " /* "[^а]а" */,
+      "\xd0\xb1\xd0\xb0 " /* ба */,
+      "\xd0\xb0\xd0\xb0 " /* аа */);
+
   /* Russian: code-point character class [мо][мо]сква matches москва */
   TestIndex(
       "[\xd0\xbc\xd0\xbe][\xd0\xbc\xd0\xbe]\xd1\x81\xd0\xba\xd0\xb2\xd0\xb0 ",

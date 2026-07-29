@@ -178,6 +178,41 @@ const char *ParsePiece(const char *p, StdMutableFst* fst, bool quoted) {
 /* Parse one character-class element (single char or ., _, etc.); append one or more
    code-point byte sequences to elements. Returns new pointer or NULL. */
 typedef std::vector<std::vector<unsigned char>> CharClassElements;
+
+/* Latin digits/letters, optional space, Cyrillic а-яё — each as one UTF-8 unit. */
+static void AppendNutrimaticAlphabet(CharClassElements *elements, bool include_space) {
+  for (int ch = '0'; ch <= '9'; ++ch)
+    elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+  for (int ch = 'a'; ch <= 'z'; ++ch)
+    elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+  if (include_space)
+    elements->push_back(std::vector<unsigned char>(1, ' '));
+  for (int cp = 0x0430; cp <= 0x044F; ++cp) {
+    std::vector<unsigned char> bytes;
+    utf8_encode(cp, &bytes);
+    elements->push_back(bytes);
+  }
+  std::vector<unsigned char> yo;
+  utf8_encode(0x0451, &yo);  /* ё */
+  elements->push_back(yo);
+}
+
+/* Add start→…→final arcs for one UTF-8 code-point byte sequence. */
+static void AddUtf8Arc(StdMutableFst* fst, State start, State final,
+                       const std::vector<unsigned char> &bytes) {
+  if (bytes.empty()) return;
+  if (bytes.size() == 1) {
+    fst->AddArc(start, StdArc(bytes[0], bytes[0], Weight::One(), final));
+    return;
+  }
+  State prev = start;
+  for (size_t j = 0; j < bytes.size(); ++j) {
+    State next_state = (j == bytes.size() - 1) ? final : fst->AddState();
+    fst->AddArc(prev, StdArc(bytes[j], bytes[j], Weight::One(), next_state));
+    prev = next_state;
+  }
+}
+
 static const char *ParseCharClassElement(const char *p, CharClassElements *elements) {
   if (p == NULL || *p == 0) return NULL;
   if ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ' ') {
@@ -198,31 +233,10 @@ static const char *ParseCharClassElement(const char *p, CharClassElements *eleme
     elements->push_back(std::vector<unsigned char>(1, ' '));
     return p + 1;
   }
-  if (*p == '.') {
-    for (int ch = '0'; ch <= '9'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    elements->push_back(std::vector<unsigned char>(1, ' '));
-    for (int ch = 0x80; ch <= 0xFF; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    return p + 1;
-  }
-  if (*p == '_') {
-    /* Like Latin [a-z0-9] plus Cyrillic letters as UTF-8 (one code point each),
-       not raw high bytes (which would not match UTF-8 м, о, … as single units). */
-    for (int ch = '0'; ch <= '9'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
-    for (int cp = 0x0430; cp <= 0x044F; ++cp) {
-      std::vector<unsigned char> bytes;
-      utf8_encode(cp, &bytes);
-      elements->push_back(bytes);
-    }
-    std::vector<unsigned char> yo;
-    utf8_encode(0x0451, &yo);
-    elements->push_back(yo);
+  if (*p == '.' || *p == '_') {
+    /* One alphabet unit as UTF-8 code points — never raw high bytes.
+       `_` = letter/digit; `.` also matches space. */
+    AppendNutrimaticAlphabet(elements, *p == '.');
     return p + 1;
   }
   if (*p == '#') {
@@ -343,36 +357,18 @@ const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
   fst->SetStart(start);
   fst->SetFinal(final, Weight::One());
   if (negate) {
-    std::set<unsigned char> forbidden;
-    for (size_t i = 0; i < elements.size(); ++i)
-      for (size_t j = 0; j < elements[i].size(); ++j)
-        forbidden.insert(elements[i][j]);
-    for (int ch = '0'; ch <= '9'; ++ch)
-      if (forbidden.find((unsigned char)ch) == forbidden.end())
-        fst->AddArc(start, StdArc(ch, ch, Weight::One(), final));
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      if (forbidden.find((unsigned char)ch) == forbidden.end())
-        fst->AddArc(start, StdArc(ch, ch, Weight::One(), final));
-    if (forbidden.find(' ') == forbidden.end())
-      fst->AddArc(start, StdArc(' ', ' ', Weight::One(), final));
-    for (int ch = 0x80; ch <= 0xFF; ++ch)
-      if (forbidden.find((unsigned char)ch) == forbidden.end())
-        fst->AddArc(start, StdArc((char)(unsigned char)ch, (char)(unsigned char)ch,
-                                  Weight::One(), final));
-  } else {
-    for (size_t i = 0; i < elements.size(); ++i) {
-      const std::vector<unsigned char> &bytes = elements[i];
-      if (bytes.size() == 1) {
-        fst->AddArc(start, StdArc(bytes[0], bytes[0], Weight::One(), final));
-      } else {
-        State prev = start;
-        for (size_t j = 0; j < bytes.size(); ++j) {
-          State next_state = (j == bytes.size() - 1) ? final : fst->AddState();
-          fst->AddArc(prev, StdArc(bytes[j], bytes[j], Weight::One(), next_state));
-          prev = next_state;
-        }
-      }
+    /* Forbid whole UTF-8 letters, not raw bytes. Otherwise [^а] bans the
+       shared D0 lead byte and blocks ба/ва/…; [^б]ень would miss день. */
+    std::set<std::vector<unsigned char>> forbidden(elements.begin(), elements.end());
+    CharClassElements alphabet;
+    AppendNutrimaticAlphabet(&alphabet, true);
+    for (size_t i = 0; i < alphabet.size(); ++i) {
+      if (forbidden.find(alphabet[i]) == forbidden.end())
+        AddUtf8Arc(fst, start, final, alphabet[i]);
     }
+  } else {
+    for (size_t i = 0; i < elements.size(); ++i)
+      AddUtf8Arc(fst, start, final, elements[i]);
   }
 
   if (!quoted) {

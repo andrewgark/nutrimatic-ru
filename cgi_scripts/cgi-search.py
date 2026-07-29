@@ -120,7 +120,8 @@ RESULT_PAGE_END = """
 
 SYNTAX = [
   ("a-z, а-я, 0-9, space", "literal match (Latin, Cyrillic, digits, space)"),
-  ("[], (), {}, |, ., ?, *, +", "same as regexp"),
+  ("[], (), {}, |, ?, *, +", "same as regexp"),
+  (". (dot)", "one letter/digit/space: [a-zа-яё0-9 ] (UTF-8; not a raw byte)"),
   ("\"expr\"", "forbid word breaks without a space or hyphen"),
   ("expr&expr", "both expressions must match (intersection)"),
   ("<aaagmnr>, <(gram)(ana)>",

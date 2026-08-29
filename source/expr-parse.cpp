@@ -13,12 +13,78 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <set>
 #include <vector>
 
 using namespace fst;
 
 typedef StdArc::StateId State;
 typedef StdArc::Weight Weight;
+
+/* UTF-8: decode next code point, advance *p, return code point or -1. */
+static int utf8_decode(const char **p) {
+  const unsigned char *s = (const unsigned char *)*p;
+  if (*s == 0) return -1;
+  int cp;
+  if (s[0] < 0x80) {
+    cp = s[0];
+    *p = (const char *)(s + 1);
+    return cp;
+  }
+  if (s[0] >= 0xC2 && s[0] < 0xE0 && s[1] != 0 && (s[1] & 0xC0) == 0x80) {
+    cp = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+    *p = (const char *)(s + 2);
+    return cp;
+  }
+  if (s[0] >= 0xE0 && s[0] < 0xF0 && s[1] != 0 && s[2] != 0 &&
+      (s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80) {
+    cp = ((s[0] & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+    if (cp >= 0x800) {
+      *p = (const char *)(s + 3);
+      return cp;
+    }
+  }
+  if (s[0] >= 0xF0 && s[0] < 0xF5 && s[1] != 0 && s[2] != 0 && s[3] != 0 &&
+      (s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80 && (s[3] & 0xC0) == 0x80) {
+    cp = ((s[0] & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) |
+         (s[3] & 0x3F);
+    if (cp >= 0x10000) {
+      *p = (const char *)(s + 4);
+      return cp;
+    }
+  }
+  return -1;
+}
+
+/* Append UTF-8 encoding of code point cp to out. */
+static void utf8_encode(int cp, std::vector<unsigned char> *out) {
+  if (cp < 0) return;
+  if (cp < 0x80) {
+    out->push_back((unsigned char)cp);
+  } else if (cp < 0x800) {
+    out->push_back((unsigned char)(0xC0 | (cp >> 6)));
+    out->push_back((unsigned char)(0x80 | (cp & 0x3F)));
+  } else if (cp < 0x10000) {
+    out->push_back((unsigned char)(0xE0 | (cp >> 12)));
+    out->push_back((unsigned char)(0x80 | ((cp >> 6) & 0x3F)));
+    out->push_back((unsigned char)(0x80 | (cp & 0x3F)));
+  } else if (cp < 0x110000) {
+    out->push_back((unsigned char)(0xF0 | (cp >> 18)));
+    out->push_back((unsigned char)(0x80 | ((cp >> 12) & 0x3F)));
+    out->push_back((unsigned char)(0x80 | ((cp >> 6) & 0x3F)));
+    out->push_back((unsigned char)(0x80 | (cp & 0x3F)));
+  }
+}
+
+/* Decode a single UTF-8 code point from byte sequence; return -1 if not exactly one. */
+static int utf8_bytes_to_cp(const std::vector<unsigned char> &bytes) {
+  if (bytes.empty()) return -1;
+  const char *p = (const char *)bytes.data();
+  const char *end = (const char *)bytes.data() + bytes.size();
+  int cp = utf8_decode(&p);
+  if (cp < 0 || p != end) return -1;
+  return cp;
+}
 
 const char *ParseExpr(const char *p, StdMutableFst* fst, bool quoted) {
   p = ParseBranch(p, fst, quoted);
@@ -109,6 +175,132 @@ const char *ParsePiece(const char *p, StdMutableFst* fst, bool quoted) {
   return p;
 }
 
+/* Parse one character-class element (single char or ., _, etc.); append one or more
+   code-point byte sequences to elements. Returns new pointer or NULL. */
+typedef std::vector<std::vector<unsigned char>> CharClassElements;
+
+/* Latin digits/letters, optional space, Cyrillic а-яё — each as one UTF-8 unit. */
+static void AppendNutrimaticAlphabet(CharClassElements *elements, bool include_space) {
+  for (int ch = '0'; ch <= '9'; ++ch)
+    elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+  for (int ch = 'a'; ch <= 'z'; ++ch)
+    elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+  if (include_space)
+    elements->push_back(std::vector<unsigned char>(1, ' '));
+  for (int cp = 0x0430; cp <= 0x044F; ++cp) {
+    std::vector<unsigned char> bytes;
+    utf8_encode(cp, &bytes);
+    elements->push_back(bytes);
+  }
+  std::vector<unsigned char> yo;
+  utf8_encode(0x0451, &yo);  /* ё */
+  elements->push_back(yo);
+}
+
+/* Add start→…→final arcs for one UTF-8 code-point byte sequence. */
+static void AddUtf8Arc(StdMutableFst* fst, State start, State final,
+                       const std::vector<unsigned char> &bytes) {
+  if (bytes.empty()) return;
+  if (bytes.size() == 1) {
+    fst->AddArc(start, StdArc(bytes[0], bytes[0], Weight::One(), final));
+    return;
+  }
+  State prev = start;
+  for (size_t j = 0; j < bytes.size(); ++j) {
+    State next_state = (j == bytes.size() - 1) ? final : fst->AddState();
+    fst->AddArc(prev, StdArc(bytes[j], bytes[j], Weight::One(), next_state));
+    prev = next_state;
+  }
+}
+
+static const char *ParseCharClassElement(const char *p, CharClassElements *elements) {
+  if (p == NULL || *p == 0) return NULL;
+  if ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ' ') {
+    elements->push_back(std::vector<unsigned char>(1, (unsigned char)*p));
+    return p + 1;
+  }
+  if ((unsigned char)*p >= 0x80) {
+    const char *q = p;
+    int cp = utf8_decode(&q);
+    if (cp < 0) return NULL;
+    std::vector<unsigned char> bytes;
+    utf8_encode(cp, &bytes);
+    elements->push_back(bytes);
+    return q;
+  }
+  if (*p == '-') {
+    elements->push_back(std::vector<unsigned char>(1, 0));
+    elements->push_back(std::vector<unsigned char>(1, ' '));
+    return p + 1;
+  }
+  if (*p == '.' || *p == '_') {
+    /* One alphabet unit as UTF-8 code points — never raw high bytes.
+       `_` = letter/digit; `.` also matches space. */
+    AppendNutrimaticAlphabet(elements, *p == '.');
+    return p + 1;
+  }
+  if (*p == '#') {
+    for (int ch = '0'; ch <= '9'; ++ch)
+      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+    return p + 1;
+  }
+  if (*p == 'A') {
+    for (int ch = 'a'; ch <= 'z'; ++ch)
+      elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+    return p + 1;
+  }
+  if (*p == 'C') {
+    for (int ch = 'a'; ch <= 'z'; ++ch)
+      if (!strchr("aeiou", ch))
+        elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+    return p + 1;
+  }
+  if (*p == 'V') {
+    for (int ch = 'a'; ch <= 'z'; ++ch)
+      if (strchr("aeiou", ch))
+        elements->push_back(std::vector<unsigned char>(1, (unsigned char)ch));
+    return p + 1;
+  }
+  /* R = Cyrillic letter [а-яё]; S = Cyrillic consonant; G = Cyrillic vowel.
+     Latin digits + letters and Cyrillic letters for “word chars” use _ . */
+  if (*p == 'R') {
+    for (int cp = 0x0430; cp <= 0x044F; ++cp) {
+      std::vector<unsigned char> bytes;
+      utf8_encode(cp, &bytes);
+      elements->push_back(bytes);
+    }
+    std::vector<unsigned char> yo;
+    utf8_encode(0x0451, &yo);  /* ё */
+    elements->push_back(yo);
+    return p + 1;
+  }
+  if (*p == 'G') {
+    static const int cyr_vowels[] = {
+      0x0430, 0x0435, 0x0451, 0x0438, 0x043E, 0x0443,
+      0x044B, 0x044D, 0x044E, 0x044F
+    };
+    for (int i = 0; i < (int)(sizeof cyr_vowels / sizeof cyr_vowels[0]); ++i) {
+      std::vector<unsigned char> bytes;
+      utf8_encode(cyr_vowels[i], &bytes);
+      elements->push_back(bytes);
+    }
+    return p + 1;
+  }
+  if (*p == 'S') {
+    for (int cp = 0x0430; cp <= 0x044F; ++cp) {
+      if (cp == 0x0430 || cp == 0x0435 || cp == 0x0438 || cp == 0x043E ||
+          cp == 0x0443 || cp == 0x044B || cp == 0x044D || cp == 0x044E ||
+          cp == 0x044F) continue;  /* skip vowels */
+      std::vector<unsigned char> bytes;
+      utf8_encode(cp, &bytes);
+      elements->push_back(bytes);
+    }
+    /* ё is vowel, skip */
+    return p + 1;
+  }
+  return NULL;
+}
+
 const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
   if (p == NULL) return NULL;
 
@@ -126,7 +318,7 @@ const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
     return p + 1;
   }
 
-  std::vector<char> chars;
+  CharClassElements elements;
   bool negate = false;
 
   if (*p == '[') {
@@ -134,26 +326,30 @@ const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
       negate = true;
       ++p;
     }
-    while (*p != ']') {
+    while (*p != ']' && *p != '\0') {
       if (*p == '-') {
-        int first = (unsigned char) *(p - 1);
-        int last = (unsigned char) *(p + 1);
-        for (int c = first + 1; c <= last; ++c) {
-          if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != ' ') {
-            return NULL;
-          } else {
-            chars.push_back(c);
-          }
+        if (elements.empty()) return NULL;
+        std::vector<unsigned char> start_bytes = elements.back();
+        elements.pop_back();
+        ++p;
+        int end_cp = utf8_decode(&p);
+        if (end_cp < 0) return NULL;
+        int start_cp = utf8_bytes_to_cp(start_bytes);
+        if (start_cp < 0 || start_cp > end_cp) return NULL;
+        for (int cp = start_cp; cp <= end_cp; ++cp) {
+          std::vector<unsigned char> bytes;
+          utf8_encode(cp, &bytes);
+          elements.push_back(bytes);
         }
-        p += 2;
       } else {
-        p = ParseCharClass(p, &chars);
-        if (p == NULL) return p;
+        p = ParseCharClassElement(p, &elements);
+        if (p == NULL) return NULL;
       }
     }
+    if (*p != ']') return NULL;
     ++p;
   } else {
-    p = ParseCharClass(p, &chars);
+    p = ParseCharClassElement(p, &elements);
     if (p == NULL) return NULL;
   }
 
@@ -161,14 +357,18 @@ const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
   fst->SetStart(start);
   fst->SetFinal(final, Weight::One());
   if (negate) {
-    std::vector<char> all;
-    ParseCharClass(".", &all);
-    for (int i = 0; i < all.size(); ++i)
-      if (find(chars.begin(), chars.end(), all[i]) == chars.end())
-        fst->AddArc(start, StdArc(all[i], all[i], Weight::One(), final));
+    /* Forbid whole UTF-8 letters, not raw bytes. Otherwise [^а] bans the
+       shared D0 lead byte and blocks ба/ва/…; [^б]ень would miss день. */
+    std::set<std::vector<unsigned char>> forbidden(elements.begin(), elements.end());
+    CharClassElements alphabet;
+    AppendNutrimaticAlphabet(&alphabet, true);
+    for (size_t i = 0; i < alphabet.size(); ++i) {
+      if (forbidden.find(alphabet[i]) == forbidden.end())
+        AddUtf8Arc(fst, start, final, alphabet[i]);
+    }
   } else {
-    for (int i = 0; i < chars.size(); ++i)
-      fst->AddArc(start, StdArc(chars[i], chars[i], Weight::One(), final));
+    for (size_t i = 0; i < elements.size(); ++i)
+      AddUtf8Arc(fst, start, final, elements[i]);
   }
 
   if (!quoted) {
@@ -180,31 +380,12 @@ const char *ParseAtom(const char *p, StdMutableFst* fst, bool quoted) {
 }
 
 const char *ParseCharClass(const char *p, std::vector<char>* out) {
-  if (p == NULL) return NULL;
-  if ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == ' ') {
-    out->push_back(*p);
-  } else if (*p == '-') {
-    out->push_back(0);
-    out->push_back(' ');
-  } else if (*p == '.') {
-    for (int ch = '0'; ch <= '9'; ++ch) out->push_back(ch);
-    for (int ch = 'a'; ch <= 'z'; ++ch) out->push_back(ch);
-    out->push_back(' ');
-  } else if (*p == '_') {
-    for (int ch = '0'; ch <= '9'; ++ch) out->push_back(ch);
-    for (int ch = 'a'; ch <= 'z'; ++ch) out->push_back(ch);
-  } else if (*p == '#') {
-    for (int ch = '0'; ch <= '9'; ++ch) out->push_back(ch);
-  } else if (*p == 'A') {
-    for (int ch = 'a'; ch <= 'z'; ++ch) out->push_back(ch);
-  } else if (*p == 'C') {
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      if (!strchr("aeiou", ch)) out->push_back(ch);
-  } else if (*p == 'V') {
-    for (int ch = 'a'; ch <= 'z'; ++ch)
-      if (strchr("aeiou", ch)) out->push_back(ch);
-  } else {
-    return NULL;
-  }
-  return p + 1;
+  CharClassElements elements;
+  const char *q = ParseCharClassElement(p, &elements);
+  if (q == NULL) return NULL;
+  out->clear();
+  for (size_t i = 0; i < elements.size(); ++i)
+    for (size_t j = 0; j < elements[i].size(); ++j)
+      out->push_back((char)elements[i][j]);
+  return q;
 }

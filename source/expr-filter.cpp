@@ -33,9 +33,10 @@ ExprFilter::ExprFilter(StdFst const& raw) {
     accepting[s] = (optimized.Final(s) != StdArc::Weight::Zero());
     for (ArcIterator<StdFst> ai(optimized, s); !ai.Done(); ai.Next()) {
       StdArc const& arc = ai.Value();
-      assert(arc.ilabel > 0 && arc.ilabel <= UCHAR_MAX);
-      assert(arc.nextstate >= 0 && arc.nextstate < next[arc.ilabel].size());
-      next[arc.ilabel][s] = arc.nextstate;
+      int b = (unsigned char) arc.ilabel;
+      assert(b > 0 && b <= UCHAR_MAX);
+      assert(arc.nextstate >= 0 && arc.nextstate < next[b].size());
+      next[b][s] = arc.nextstate;
     }
   }
 }

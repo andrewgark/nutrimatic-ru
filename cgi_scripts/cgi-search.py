@@ -28,19 +28,21 @@ PER_PAGE = 100
 
 HOME_PAGE_BEGIN = """
 <html lang="en"><head>
+  <meta charset="utf-8">
   <title>Nutrimatic</title>
   <link rel="icon" type="image/vnd.microsoft.icon" href="/favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="google-site-verification" content="HYukS48AhdgGIgHndvQBdN5aoJJHHWnvMq_OJfcpVYg" />
 </head><body>
 <p><em>Almost, but not quite, entirely unlike tea.</em></p>
-<form action="" method=get>
+<form action="" method=get accept-charset="utf-8">
 <input type=search name=q size=45 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 <input type=submit name=go value="Go">
 </form>
 <p>Matches patterns against a dictionary of words and phrases
-mined from Wikipedia.  Text is normalized to lowercase letters,
-numbers and spaces.  More common results are returned first.</p>
+mined from Russian Wikipedia.  Text is normalized to lowercase letters
+(Latin and Cyrillic), numbers and spaces.  More common results
+are returned first.  Input is UTF-8.</p>
 """
 
 HOME_PAGE_LIST_BEGIN = """
@@ -67,9 +69,11 @@ HOME_PAGE_LIST_END = """
 HOME_PAGE_END = """
 <h3>More</h3>
 <ul>
-<li><a href="usage.html">Usage guide</a>: usage tips,
+<li><a href="https://nutrimatic.org/usage.html">Usage guide</a> (original
+English‑Wikipedia Nutrimatic on nutrimatic.org): usage tips,
 worked examples, why it's slow.
-<li><a href="https://github.com/PuzzleTechHub/nutrimatic">Source code</a>:
+<li><a href="https://github.com/andrewgark/nutrimatic-ru">Source code</a>
+for this Russian Wikipedia fork on GitHub:
 not completely documented, but it's there!
 </ul>
 
@@ -78,12 +82,13 @@ not completely documented, but it's there!
 
 RESULT_PAGE_BEGIN = """
 <html lang="en"><head>
+  <meta charset="utf-8">
   <title>%(query)s - Nutrimatic</title>
   <link rel="icon" type="image/vnd.microsoft.icon" href="/favicon.ico">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<form action="" method=get>
+<form action="" method=get accept-charset="utf-8">
 <input type=search name=q value="%(query)s" size=45 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 <input type=submit name=go value="Go">
 </form>
@@ -114,29 +119,39 @@ RESULT_PAGE_END = """
 # List of syntax descriptions and examples for the search page
 
 SYNTAX = [
-  ("a-z, 0-9, space", "literal match"),
-  ("[], (), {}, |, ., ?, *, +", "same as regexp"),
+  ("a-z, а-я, 0-9, space", "literal match (Latin, Cyrillic, digits, space)"),
+  ("[], (), {}, |, ?, *, +", "same as regexp"),
+  (". (dot)", "one letter/digit/space: [a-zа-яё0-9 ] (UTF-8; not a raw byte)"),
   ("\"expr\"", "forbid word breaks without a space or hyphen"),
-  ("expr&expr", "both expressions must match"),
+  ("expr&expr", "both expressions must match (intersection)"),
   ("<aaagmnr>, <(gram)(ana)>",
-   "anagram of contents (<a href=usage.html#syntax_anagram>note warnings</a>)"),
-  ("_ (underscore)", "alphanumeric, not space: [a-z0-9]"),
+   "anagram of contents (<a href=\"https://nutrimatic.org/usage.html#syntax_anagram\">note warnings</a>)"),
+  ("_ (underscore)", "one letter/digit: [a-zа-я0-9] (UTF-8)"),
   ("# (number sign)", "digit: [0-9]"),
-  ("- (hyphen)", "optional space: ( ?)"),
-  ("A", "alphabetic: [a-z]"),
-  ("C", "consonant (including y)"),
-  ("V", "vowel ([aeiou], not y)"),
+  ("A", "Latin letter: [a-z]"),
+  ("C", "Latin consonant (including y)"),
+  ("V", "Latin vowel ([aeiou], not y)"),
+  ("R", "Cyrillic letter: [а-я]"),
+  ("S", "Cyrillic consonant"),
+  ("G", "Cyrillic vowel (а, е, и, о, у, ы, э, ю, я)"),
 ]
 
 EXAMPLES = [
-  ("\"C*aC*eC*iC*oC*uC*yC*\"", "facetiously"),
-  ("867-####", "for a good time call"),
-  ("\"_ ___ ___ _*burger\"", "lol"),
+  ("\"SGSGSGS\"",
+   "seven letters, alternating Cyrillic consonant / vowel (quoted = one word)"),
+  ("<ватерполистка>", "anagram"),
+  ("13п_*у",
+   "numbers and letters"),
+  ("\"_ ____ю __ ______\"",
+   "partially filled mask"),
+  ("\"CC RRR\"", "Latin + Cyrillic"),
 ]
 
 EDITIONS = [
-  ("https://nutrimatic.org/2016/", "'classic' original"),
-  ("https://nutrimatic.org/2024/", "current edition (refreshed index)"),
+  ("https://nutrimatic.org/2016/",
+   "“Classic” public Nutrimatic; dictionary from the English Wikipedia"),
+  ("https://nutrimatic.org/2024/",
+   "Current public Nutrimatic; refreshed English‑Wikipedia index"),
 ]
 
 binary = os.environ["NUTRIMATIC_FIND_EXPR"]
@@ -165,7 +180,7 @@ if 'q' not in fs:  # No query, emit the home page
       })
   print(HOME_PAGE_LIST_END)
 
-  print(HOME_PAGE_LIST_BEGIN % {"title": "Editions"})
+  print(HOME_PAGE_LIST_BEGIN % {"title": "Original versions"})
   for url, text in EDITIONS:
     parts = urllib.parse.urlparse(url)._replace(scheme="")
     print(HOME_PAGE_EDITION_ROW % {
@@ -191,7 +206,9 @@ soft, hard = resource.getrlimit(resource.RLIMIT_AS)
 if hard == -1 or hard > 2048 * 1024 * 1024: hard = 2048 * 1024 * 1024
 resource.setrlimit(resource.RLIMIT_AS, (hard, hard))
 
-proc = subprocess.Popen([binary, index, query],
+# Pass query as UTF-8 bytes so find-expr receives correct encoding (e.g. Cyrillic).
+query_bytes = query.encode('utf-8') if isinstance(query, str) else query
+proc = subprocess.Popen([binary, index, query_bytes],
     preexec_fn=lambda: signal.signal(signal.SIGPIPE, signal.SIG_DFL),
     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

@@ -108,13 +108,42 @@ To actually use Nutrimatic, you will need to build an index from Wikipedia.
      build/find-expr wiki-merged.index '<aciimnrttu>'
      ```
 
+### Building a Russian (Cyrillic) index
+
+Nutrimatic supports UTF-8 and Cyrillic. To build an index from Russian Wikipedia:
+
+1. Download the Russian Wikipedia dump:
+
+     ```
+     wget https://dumps.wikimedia.org/ruwiki/latest/ruwiki-latest-pages-articles.xml.bz2
+     ```
+
+2. Extract with WikiExtractor (same as English):
+
+     ```
+     wikiextractor ruwiki-latest-pages-articles.xml.bz2
+     ```
+
+3. Index and merge the same way (use a distinct prefix if you like):
+
+     ```
+     find text -type f | xargs cat | build/make-index ruwiki
+     ```
+
+   Then merge (e.g. same two-stage merge as above, with `ruwiki` instead of `wikipedia`).
+
+4. Use the merged index the same way: set `NUTRIMATIC_INDEX` to the Russian merged index, or run `find-expr` with it. Queries can use Cyrillic literals and patterns; input is UTF-8.
+
 ### Serving the web interface
 
-If you want to run the [nutrimatic.org](https://nutrimatic.org/) style
-interface, point a web server at the `web_static/` directory, and for
+**Local (Russian index):** From the project root, run
+`python3 run_server.py [port]` (default port 8765). Open
+http://localhost:8765/ — uses `build/find-expr` and `wiki-merged.index`.
+
+**Production:** Point a web server at the `web_static/` directory, and for
 root requests have it launch `cgi_scripts/cgi-search.py` with
 `$NUTRIMATIC_FIND_EXPR` set to the `find-expr` binary and `$NUTRIMATIC_INDEX`
-set to the index you built.
+set to the index you built. See `nginx-nutrimatic-ru.conf.example` for nginx + fcgiwrap.
 
 (You might want to use `install_to_dir.py` which will copy executables,
 CGI scripts, and static content to the directory of your choice.)

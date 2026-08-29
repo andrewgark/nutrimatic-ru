@@ -1,0 +1,23 @@
+# Example nginx config for Nutrimatic Russian index.
+# Copy to /etc/nginx/sites-available/ and symlink from sites-enabled,
+# or include in your server block. Adjust paths and server_name.
+#
+# Prerequisites: fcgiwrap (e.g. apt install fcgiwrap), socket at
+# /var/run/fcgiwrap.socket or as below.
+# Install dir: path where find-expr, cgi-search.py, web_static/, wiki-merged.index live
+# (e.g. after install_to_dir.py /opt/nutrimatic-ru or the project root).
+
+location /nutrimatic-ru/ {
+  alias /home/andre/nutrimatic-ru/web_static/;
+
+  location = /nutrimatic-ru/ {
+    fastcgi_pass unix:/var/run/fcgiwrap.socket;
+    fastcgi_buffering off;
+    include /etc/nginx/fastcgi_params;
+    gzip off;
+
+    fastcgi_param SCRIPT_FILENAME /home/andre/nutrimatic-ru/cgi_scripts/cgi-search.py;
+    fastcgi_param NUTRIMATIC_FIND_EXPR /home/andre/nutrimatic-ru/build/find-expr;
+    fastcgi_param NUTRIMATIC_INDEX /home/andre/nutrimatic-ru/wiki-merged.index;
+  }
+}
